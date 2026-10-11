@@ -1,10 +1,10 @@
 /**
  * Majlis Tunang checklist  <->  this Google Sheet
  *
- * The checklist website reads and saves its data here. Tabs (created automatically the first time):
+ * The checklist website reads and saves its data here, and only with the passcode. Tabs (created automatically the first time):
  *   Kategori : one row per category
  *   Items    : one row per item (Jumlah is a formula, Done is a checkbox)
- *   Settings : bajet
+ *   Settings : bajet, tarikh majlis, tema (kept here so they're not in the public repo)
  * You can also edit the Sheet directly; the website shows it on the next refresh.
  *
  * Setup: see GOOGLE_SHEET_SETUP.md in the repo.
@@ -24,8 +24,9 @@ const KIND_LABEL = { biasa: 'Biasa', pax: 'Makanan', task: 'Task' };
 
 // ---------- web app ----------
 
+// Opening the link directly shows nothing: the data only goes out to a request carrying the passcode.
 function doGet() {
-  return json({ ok: true, data: readAll() });
+  return json({ ok: false, error: 'Private. Buka checklist dan masukkan passcode.' });
 }
 
 function doPost(e) {
@@ -34,6 +35,7 @@ function doPost(e) {
   if (!passcode()) return json({ ok: false, error: 'PASSCODE belum diset dalam Script Properties' });
   if (String(body.pass || '') !== passcode()) return json({ ok: false, error: 'Passcode salah' });
   if (body.action === 'check') return json({ ok: true });
+  if (body.action === 'load') return json({ ok: true, data: readAll() });
   if (body.action === 'save') {
     const lock = LockService.getScriptLock();
     lock.waitLock(15000);
@@ -120,11 +122,16 @@ function readAll() {
     });
   });
 
-  let budget = '';
-  body(st, 2).forEach(function (r) { if (/bajet|budget/i.test(String(r[0]))) budget = numOrBlank(r[1]); });
+  let budget = '', date = '', theme = '';
+  body(st, 2).forEach(function (r) {
+    const key = String(r[0]);
+    if (/bajet|budget/i.test(key)) budget = numOrBlank(r[1]);
+    else if (/tarikh|date/i.test(key)) date = toIso(r[1]);
+    else if (/tema|theme/i.test(key)) theme = String(r[1] || '').trim();
+  });
 
   if (fixed) SpreadsheetApp.flush();
-  return { budget: budget, cats: cats, items: items };
+  return { budget: budget, date: date, theme: theme, cats: cats, items: items };
 }
 
 // ---------- write: website -> Sheet ----------
@@ -160,8 +167,10 @@ function writeAll(data) {
     is.getRange(2, 11, n, 2).setNumberFormat('d mmm yyyy');
   }
 
-  replaceBody(st, 2, [['Bajet (RM)', numOrBlank(data.budget)], ['Last saved', new Date()]]);
-  st.getRange(3, 2).setNumberFormat('d mmm yyyy, h:mm am/pm');
+  replaceBody(st, 2, [['Bajet (RM)', numOrBlank(data.budget)], ['Tarikh majlis', toIso(data.date)],
+    ['Tema', data.theme || ''], ['Last saved', new Date()]]);
+  st.getRange(3, 2).setNumberFormat('d mmm yyyy');
+  st.getRange(5, 2).setNumberFormat('d mmm yyyy, h:mm am/pm');
 }
 
 function replaceBody(sh, width, rows) {

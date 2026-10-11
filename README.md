@@ -1,15 +1,17 @@
 # engagement_tracker
 
-A minimalist, pink checklist and budget tracker for Areef & Amyra's majlis tunang (3 April 2027), and the kahwin, coming soon.
+A minimalist, pink checklist and budget tracker for Areef & Amyra's majlis tunang, and the kahwin, coming soon.
 
 - `index.html`: landing page
 - `tunang.html`: engagement checklist
-- `data/tunang.js`: names, date, theme, bajet, the Google Sheet link (`sheetUrl`), and the starting list of categories and items
+- `data/tunang.js`: names, bajet, the Google Sheet link (`sheetUrl`), and the starting list of categories and items
 - `js/app.js`: shared checklist and budget engine
 - `css/style.css`: styles; change `--accent` to retheme
 - `apps-script/Code.gs`: the Google Apps Script that connects the page to a Google Sheet
 
 ## Where the data lives
+
+The majlis date and theme are kept in the Google Sheet (Settings tab), not in this public repo.
 
 - **With a Google Sheet connected** (`sheetUrl` set): the Sheet is the live data. Every change on the page is saved
   to it, and everyone opening the page sees the same thing. Saving needs the passcode; without it the page is view-only.

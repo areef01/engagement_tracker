@@ -5,8 +5,7 @@ window.CHECKLIST = {
   id: 'tunang',
   title: 'Majlis Tunang',
   couple: ['Areef', 'Amyra'],
-  date: '2027-04-03',            // 3 April 2027
-  theme: 'Pink',
+  // The majlis date & theme are private: they live in the Google Sheet (Settings tab) and only show after unlocking.
   tagline: 'Dua hati, satu janji, dengan restu & doa.',
   budget: 1000,
   // Google Sheet link (the Apps Script "Web app" URL ending in /exec). Leave '' to keep data in this browser only.

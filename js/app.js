@@ -40,7 +40,7 @@
         ref: i.pax && !i.custom ? `${P0.guests} pax × RM${P0.perHead}` : i.ref > 0 ? rm(i.ref) : ''
       });
     }));
-    return { budget: S.budget ?? D.budget, cats: cats.map(c => ({ id: c.id, emoji: c.emoji, name: c.name, tip: c.tip || '' })), items };
+    return { budget: S.budget ?? D.budget, date: D.date || '', theme: D.theme || '', cats: cats.map(c => ({ id: c.id, emoji: c.emoji, name: c.name, tip: c.tip || '' })), items };
   }
   const isModel = x => x && Array.isArray(x.cats) && Array.isArray(x.items);
 
@@ -50,6 +50,7 @@
   if (!ui.sel && store.get(OLD_KEY)) ui.sel = store.get(OLD_KEY).sel || null;
 
   const canEdit = () => !SHEET || !!ui.pass;
+  const locked = () => !!SHEET && !ui.pass;      // private: nothing is shown until the passcode is entered
   function save() {             // every edit: cache locally, then (debounced) push to the Sheet
     store.set(KEY, M);
     sync.queue();
@@ -160,7 +161,61 @@
       <button class="add-item" data-additem="${esc(g.id)}">+ Tambah item dalam ${esc(g.name)}</button>`;
   }
 
+  // Header. Date & theme are private (they come from the Sheet), so the locked view shows the names only.
+  const heroHTML = () => {
+    const date = !locked() && M.date, theme = !locked() && M.theme;
+    return `
+        <header class="hero">
+          <p class="kicker">${esc(D.title)}</p>
+          ${D.couple ? `<h1 class="couple">${esc(D.couple[0])} <span>&amp;</span> ${esc(D.couple[1])}</h1>` : `<h1>${esc(D.title)}</h1>`}
+          ${locked() ? `<p class="when secret">🔒 Butiran majlis dirahsiakan ♡</p>`
+            : date ? `<p class="when">${longDate(date)} <button class="edit-event" data-act="editevent" title="Tukar tarikh / tema" aria-label="Tukar tarikh atau tema">✎</button></p>`
+            : `<p class="when"><button class="set-date" data-act="editevent">✎ Set tarikh majlis</button></p>`}
+          ${date || theme ? `<p class="hero-pills">
+            ${theme ? `<span class="pill-theme"><i></i>Tema ${esc(theme)}</span>` : ''}
+            ${date ? `<span class="pill-count">⏳ ${countdown(date)}</span>` : ''}
+          </p>` : ''}
+          ${locked() ? '' : `<form class="event-form" data-eventform hidden>
+            <label>Tarikh majlis<input type="date" name="date" value="${val(M.date)}"></label>
+            <label>Tema<input name="theme" value="${val(M.theme)}" placeholder="cth. Pink"></label>
+            <button type="submit">Simpan</button>
+          </form>`}
+          <p class="tagline" title="${esc(D.source || '')}">${esc(D.tagline || '')}</p>
+        </header>`;
+  };
+
+  // Locked: only the invitation-style header plus blurred placeholder shapes; no real data is in the page
+  function renderLocked(msg) {
+    const bars = n => Array.from({ length: n }, (_, k) => `<i style="width:${[78, 55, 66, 40, 70, 48][k % 6]}%"></i>`).join('');
+    const kpi = `<div class="skel-kpi">${bars(3)}</div>`;
+    app.innerHTML = `
+      <aside class="side">
+        <a class="back" href="index.html">← Semua checklist</a>
+        ${heroHTML()}
+        <div class="card skel" aria-hidden="true"><b></b>${bars(3)}</div>
+        <div class="card skel" aria-hidden="true">${bars(6)}</div>
+      </aside>
+      <div class="main locked-main">
+        <div class="skel-board" aria-hidden="true">
+          <div class="skel-kpis">${kpi.repeat(4)}</div>
+          <div class="card skel skel-table"><b></b>${bars(12)}</div>
+        </div>
+        <form class="card lock-card" data-unlock>
+          <div class="lock-ico" aria-hidden="true">🔒</div>
+          <h2>Private ♡</h2>
+          <p>Checklist &amp; bajet ni untuk ${D.couple ? esc(D.couple.join(' & ')) : 'kami'} je. Masukkan passcode untuk tengok.</p>
+          <div class="lock-row">
+            <input name="pass" type="password" placeholder="Passcode" autocomplete="current-password" aria-label="Passcode" autofocus>
+            <button type="submit">Unlock</button>
+          </div>
+          <small class="lock-msg" data-lock-msg>${esc(msg || '')}</small>
+        </form>
+      </div>`;
+    document.body.classList.remove('readonly');
+  }
+
   function render() {
+    if (locked()) { renderLocked(); return; }
     const G = groups(), sel = selected();
     const rows = G.map(g => `
       <tr data-sel="${esc(g.id)}" tabindex="0">
@@ -179,16 +234,7 @@
     app.innerHTML = `
       <aside class="side">
         <a class="back" href="index.html">← Semua checklist</a>
-        <header class="hero">
-          <p class="kicker">${esc(D.title)}</p>
-          ${D.couple ? `<h1 class="couple">${esc(D.couple[0])} <span>&amp;</span> ${esc(D.couple[1])}</h1>` : `<h1>${esc(D.title)}</h1>`}
-          ${D.date ? `<p class="when">${longDate(D.date)}</p>` : ''}
-          <p class="hero-pills">
-            ${D.theme ? `<span class="pill-theme"><i></i>Tema ${esc(D.theme)}</span>` : ''}
-            ${D.date ? `<span class="pill-count">⏳ ${countdown(D.date)}</span>` : ''}
-          </p>
-          <p class="tagline" title="${esc(D.source || '')}">${esc(D.tagline || '')}</p>
-        </header>
+        ${heroHTML()}
 
         <section class="card budget">
           <div class="budget-top">
@@ -269,6 +315,7 @@
   }
 
   function renderDetail() {
+    if (locked()) return;
     app.querySelector('.detail').innerHTML = detailHTML(selected());
     markSelected();
     totals();
@@ -390,10 +437,8 @@
   const sync = {
     state: SHEET ? 'loading' : 'local', msg: '', at: null, timer: null, busy: false, dirty: false,
 
-    async call(payload) {
-      const res = payload
-        ? await fetch(SHEET, { method: 'POST', body: JSON.stringify(payload) })   // text/plain: no CORS preflight
-        : await fetch(SHEET + (SHEET.includes('?') ? '&' : '?') + 'action=load&t=' + Date.now());
+    async call(payload) {      // always POST with the passcode; text/plain body means no CORS preflight
+      const res = await fetch(SHEET, { method: 'POST', body: JSON.stringify(payload) });
       const out = await res.json();
       if (!out.ok) throw new Error(out.error || 'Google Sheet error');
       return out;
@@ -415,7 +460,7 @@
         this.set(this.dirty ? 'saving' : 'saved');
       } catch (e) {
         this.dirty = true;
-        if (/passcode/i.test(e.message)) { ui.pass = ''; saveUi(); render(); this.set('view', 'Passcode dah bertukar. Unlock semula.'); }
+        if (/passcode/i.test(e.message)) { lockOut(false, 'Passcode dah bertukar. Masukkan yang baru.'); return; }
         else { this.set('error', e.message); clearTimeout(this.timer); this.timer = setTimeout(() => this.push(), 15000); }
       }
       this.busy = false;
@@ -423,24 +468,25 @@
     },
 
     async pull(first) {
-      if (!SHEET || this.busy || this.dirty) return;
+      if (locked() || this.busy || this.dirty) return;
       const editing = document.activeElement && document.activeElement.matches('input') || document.querySelector('dialog[open]');
       if (!first && editing) return;              // don't yank inputs out from under someone typing
       try {
         if (first) this.set('loading');
-        const { data } = await this.call();
+        const { data } = await this.call({ action: 'load', pass: ui.pass });
         if (isModel(data) && (data.cats.length || data.items.length)) {
           const changed = JSON.stringify(data) !== JSON.stringify(M);
           M = data; store.set(KEY, M);
           if (changed || first) render();
-          this.at = new Date(); this.set(ui.pass ? 'saved' : 'view');
-        } else if (ui.pass) {                       // empty Sheet: fill it with what this browser has
+          this.at = new Date(); this.set('saved');
+        } else {                                     // empty Sheet: fill it with what this browser has
           this.queue();
-        } else {
-          this.set('view', 'Google Sheet masih kosong. Unlock untuk isi dengan data ni.');
         }
       } catch (e) {
-        this.set('error', 'Tak dapat buka Google Sheet. Tunjuk data terakhir dalam browser ni.');
+        if (/passcode/i.test(e.message)) return lockOut(false, 'Passcode dah bertukar. Masukkan yang baru.');
+        this.set('error', /unknown action/i.test(e.message)
+          ? 'Script Google belum dikemas kini (Deploy > Manage deployments > New version).'
+          : 'Tak dapat buka Google Sheet. Tunjuk data terakhir dalam browser ni.');
       }
     },
 
@@ -550,6 +596,12 @@
   app.addEventListener('submit', e => {
     const uf = e.target.closest('[data-unlock]');
     if (uf) { e.preventDefault(); unlock(uf); return; }
+    const ef = e.target.closest('[data-eventform]');
+    if (ef) {
+      e.preventDefault();
+      M.date = ef.date.value; M.theme = ef.theme.value.trim();
+      save(); render(); return;
+    }
     const cf = e.target.closest('[data-catform]');
     if (!cf) return;
     e.preventDefault();
@@ -574,14 +626,27 @@
     try {
       await sync.call({ action: 'check', pass });
       ui.pass = pass; saveUi();
+      sync.set('loading');
       render();
-      sync.set('saved');
-      sync.pull(true);                               // reload; fills an empty Sheet with this browser's data
+      sync.pull(true);                               // load the Sheet; an empty Sheet is filled with this browser's data
+      return;
     } catch (err) {
-      f.pass.value = ''; f.pass.placeholder = /passcode/i.test(err.message) ? 'Passcode salah, cuba lagi' : 'Tak dapat sambung, cuba lagi';
+      f.pass.value = '';
+      const m = f.querySelector('[data-lock-msg]');
+      if (m) m.textContent = /passcode/i.test(err.message) ? 'Passcode salah, cuba lagi.' : 'Tak dapat sambung. Cuba lagi sekejap.';
       f.classList.remove('nudge'); void f.offsetWidth; f.classList.add('nudge');
+      f.pass.focus();
     }
     btn.disabled = false; btn.textContent = 'Unlock';
+  }
+
+  // wipe = also forget this browser's copy of the data (the "Lock" button), so nothing stays on a shared device
+  function lockOut(wipe, msg) {
+    clearTimeout(sync.timer);
+    ui.pass = ''; saveUi();
+    if (wipe) { try { localStorage.removeItem(KEY); localStorage.removeItem(OLD_KEY); } catch (e) {} M = seed(null); }
+    if (dlg.open) dlg.close();
+    renderLocked(msg);
   }
 
   let rt;
@@ -630,8 +695,11 @@
       if (!confirm(SHEET ? 'Reset semua data ke senarai asal? Google Sheet pun akan di-overwrite.' : 'Reset semua tick, harga, tarikh & item tambahan?')) return;
       M = seed(null); ui.sel = null; saveUi(); save(); render();
     },
-    lock() {
-      ui.pass = ''; saveUi(); render(); sync.set('view');
+    lock() { lockOut(true); },
+    editevent() {
+      const f = app.querySelector('[data-eventform]');
+      f.hidden = !f.hidden;
+      if (!f.hidden) f.date.focus();
     }
   };
 
@@ -751,7 +819,7 @@
   });
 
   if (D.couple) document.title = `${D.title} · ${D.couple.join(' & ')} ♡`;
-  store.set(KEY, M);                                  // keep the converted model even before the first edit
+  if (!locked()) store.set(KEY, M);                  // keep the converted model even before the first edit
   render();
   if (document.fonts) document.fonts.ready.then(marquee);   // re-measure once real fonts load
   sync.pull(true);

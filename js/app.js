@@ -40,7 +40,7 @@
         ref: i.pax && !i.custom ? `${P0.guests} pax × RM${P0.perHead}` : i.ref > 0 ? rm(i.ref) : ''
       });
     }));
-    return { budget: S.budget ?? D.budget, date: D.date || '', theme: D.theme || '', cats: cats.map(c => ({ id: c.id, emoji: c.emoji, name: c.name, tip: c.tip || '' })), items };
+    return { budget: S.budget ?? D.budget, couple: '', date: '', theme: '', cats: cats.map(c => ({ id: c.id, emoji: c.emoji, name: c.name, tip: c.tip || '' })), items };
   }
   const isModel = x => x && Array.isArray(x.cats) && Array.isArray(x.items);
 
@@ -161,21 +161,23 @@
       <button class="add-item" data-additem="${esc(g.id)}">+ Tambah item dalam ${esc(g.name)}</button>`;
   }
 
-  // Header. Date & theme are private (they come from the Sheet), so the locked view shows the names only.
+  // Header. Names, date & theme are private (they come from the Sheet): the locked view shows none of them.
+  const coupleHTML = c => esc(c).replace(/\s*&amp;\s*/, ' <span>&amp;</span> ');
   const heroHTML = () => {
-    const date = !locked() && M.date, theme = !locked() && M.theme;
+    const couple = !locked() && M.couple, date = !locked() && M.date, theme = !locked() && M.theme;
     return `
         <header class="hero">
-          <p class="kicker">${esc(D.title)}</p>
-          ${D.couple ? `<h1 class="couple">${esc(D.couple[0])} <span>&amp;</span> ${esc(D.couple[1])}</h1>` : `<h1>${esc(D.title)}</h1>`}
+          <p class="kicker">${locked() ? '♡ Private' : esc(D.title)}</p>
+          <h1 class="couple">${couple ? coupleHTML(couple) : esc(D.title)}</h1>
           ${locked() ? `<p class="when secret">🔒 Butiran majlis dirahsiakan ♡</p>`
-            : date ? `<p class="when">${longDate(date)} <button class="edit-event" data-act="editevent" title="Tukar tarikh / tema" aria-label="Tukar tarikh atau tema">✎</button></p>`
-            : `<p class="when"><button class="set-date" data-act="editevent">✎ Set tarikh majlis</button></p>`}
+            : date ? `<p class="when">${longDate(date)} <button class="edit-event" data-act="editevent" title="Tukar nama / tarikh / tema" aria-label="Tukar nama, tarikh atau tema">✎</button></p>`
+            : `<p class="when"><button class="set-date" data-act="editevent">✎ Set nama &amp; tarikh majlis</button></p>`}
           ${date || theme ? `<p class="hero-pills">
             ${theme ? `<span class="pill-theme"><i></i>Tema ${esc(theme)}</span>` : ''}
             ${date ? `<span class="pill-count">⏳ ${countdown(date)}</span>` : ''}
           </p>` : ''}
           ${locked() ? '' : `<form class="event-form" data-eventform hidden>
+            <label>Nama<input name="couple" value="${val(M.couple)}" placeholder="cth. Ali &amp; Siti"></label>
             <label>Tarikh majlis<input type="date" name="date" value="${val(M.date)}"></label>
             <label>Tema<input name="theme" value="${val(M.theme)}" placeholder="cth. Pink"></label>
             <button type="submit">Simpan</button>
@@ -203,7 +205,7 @@
         <form class="card lock-card" data-unlock>
           <div class="lock-ico" aria-hidden="true">🔒</div>
           <h2>Private ♡</h2>
-          <p>Checklist &amp; bajet ni untuk ${D.couple ? esc(D.couple.join(' & ')) : 'kami'} je. Masukkan passcode untuk tengok.</p>
+          <p>Checklist &amp; bajet ni private. Masukkan passcode untuk tengok.</p>
           <div class="lock-row">
             <input name="pass" type="password" placeholder="Passcode" autocomplete="current-password" aria-label="Passcode" autofocus>
             <button type="submit">Unlock</button>
@@ -215,6 +217,7 @@
   }
 
   function render() {
+    document.title = `${D.title}${!locked() && M.couple ? ' · ' + M.couple : ''} ♡`;
     if (locked()) { renderLocked(); return; }
     const G = groups(), sel = selected();
     const rows = G.map(g => `
@@ -599,7 +602,7 @@
     const ef = e.target.closest('[data-eventform]');
     if (ef) {
       e.preventDefault();
-      M.date = ef.date.value; M.theme = ef.theme.value.trim();
+      M.couple = ef.couple.value.trim(); M.date = ef.date.value; M.theme = ef.theme.value.trim();
       save(); render(); return;
     }
     const cf = e.target.closest('[data-catform]');
@@ -646,6 +649,7 @@
     ui.pass = ''; saveUi();
     if (wipe) { try { localStorage.removeItem(KEY); localStorage.removeItem(OLD_KEY); } catch (e) {} M = seed(null); }
     if (dlg.open) dlg.close();
+    document.title = `${D.title} ♡`;
     renderLocked(msg);
   }
 
@@ -818,7 +822,6 @@
     if (tr) { tr.scrollIntoView({ block: 'nearest' }); tr.classList.add('flash'); }
   });
 
-  if (D.couple) document.title = `${D.title} · ${D.couple.join(' & ')} ♡`;
   if (!locked()) store.set(KEY, M);                  // keep the converted model even before the first edit
   render();
   if (document.fonts) document.fonts.ready.then(marquee);   // re-measure once real fonts load

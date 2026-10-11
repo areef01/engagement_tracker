@@ -4,7 +4,7 @@
  * The checklist website reads and saves its data here, and only with the passcode. Tabs (created automatically the first time):
  *   Kategori : one row per category
  *   Items    : one row per item (Jumlah is a formula, Done is a checkbox)
- *   Settings : bajet, tarikh majlis, tema (kept here so they're not in the public repo)
+ *   Settings : bajet, nama pasangan, tarikh majlis, tema (kept here so they're not in the public repo)
  * You can also edit the Sheet directly; the website shows it on the next refresh.
  *
  * Setup: see GOOGLE_SHEET_SETUP.md in the repo.
@@ -122,16 +122,17 @@ function readAll() {
     });
   });
 
-  let budget = '', date = '', theme = '';
+  let budget = '', couple = '', date = '', theme = '';
   body(st, 2).forEach(function (r) {
     const key = String(r[0]);
     if (/bajet|budget/i.test(key)) budget = numOrBlank(r[1]);
+    else if (/nama|couple|name/i.test(key)) couple = String(r[1] || '').trim();
     else if (/tarikh|date/i.test(key)) date = toIso(r[1]);
     else if (/tema|theme/i.test(key)) theme = String(r[1] || '').trim();
   });
 
   if (fixed) SpreadsheetApp.flush();
-  return { budget: budget, date: date, theme: theme, cats: cats, items: items };
+  return { budget: budget, couple: couple, date: date, theme: theme, cats: cats, items: items };
 }
 
 // ---------- write: website -> Sheet ----------
@@ -167,10 +168,10 @@ function writeAll(data) {
     is.getRange(2, 11, n, 2).setNumberFormat('d mmm yyyy');
   }
 
-  replaceBody(st, 2, [['Bajet (RM)', numOrBlank(data.budget)], ['Tarikh majlis', toIso(data.date)],
-    ['Tema', data.theme || ''], ['Last saved', new Date()]]);
-  st.getRange(3, 2).setNumberFormat('d mmm yyyy');
-  st.getRange(5, 2).setNumberFormat('d mmm yyyy, h:mm am/pm');
+  replaceBody(st, 2, [['Bajet (RM)', numOrBlank(data.budget)], ['Nama pasangan', data.couple || ''],
+    ['Tarikh majlis', toIso(data.date)], ['Tema', data.theme || ''], ['Last saved', new Date()]]);
+  st.getRange(4, 2).setNumberFormat('d mmm yyyy');
+  st.getRange(6, 2).setNumberFormat('d mmm yyyy, h:mm am/pm');
 }
 
 function replaceBody(sh, width, rows) {

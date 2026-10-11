@@ -436,6 +436,7 @@ h1, h2 { font-family: "Fraunces", Georgia, serif; font-weight: 500; margin: 0; }
 .event-form label { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--muted); font-weight: 600; text-align: left; }
 .event-form input { border: 1px solid var(--line); border-radius: 10px; padding: 5px 8px; background: var(--card); font-size: 13px; width: 130px; }
 .event-form input[name="theme"] { width: 80px; }
+.event-form input[name="couple"] { width: 140px; }
 .event-form input:focus { outline: none; border-color: var(--accent); }
 .event-form button { border: none; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 700; padding: 6px 12px; cursor: pointer; }
 
